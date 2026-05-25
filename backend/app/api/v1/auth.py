@@ -1,41 +1,85 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from app.db.deps import get_db
+from app.db.session import get_db
 from app.models.user import User
-from app.core.auth.security import hash_password, verify_password, create_access_token
+from app.schemas.auth import (
+    RegisterRequest,
+    LoginRequest,
+    TokenResponse
+)
+from app.core.auth.security import (
+    hash_password,
+    verify_password,
+    create_access_token
+)
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter()
 
 
 @router.post("/register")
-async def register(email: str, password: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
+def register(
+    payload: RegisterRequest,
+    db: Session = Depends(get_db)
+):
+    existing = db.query(User).filter(
+        User.email == payload.email
+    ).first()
 
-    if user:
-        raise HTTPException(status_code=400, detail="User already exists")
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
 
-    new_user = User(
-        email=email,
-        hashed_password=hash_password(password)
+    user = User(
+        email=payload.email,
+        hashed_password=hash_password(
+            payload.password
+        )
     )
 
-    db.add(new_user)
-    await db.commit()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
 
-    return {"status": "created"}
+    return {
+        "id": user.id,
+        "email": user.email
+    }
 
 
-@router.post("/login")
-async def login(email: str, password: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
+@router.post(
+    "/login",
+    response_model=TokenResponse
+)
+def login(
+    payload: LoginRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        User.email == payload.email
+    ).first()
 
-    if not user or not verify_password(password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
 
-    token = create_access_token({"sub": str(user.id)})
+    if not verify_password(
+        payload.password,
+        user.hashed_password
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
 
-    return {"access_token": token, "token_type": "bearer"}
+    token = create_access_token(
+        subject=str(user.id)
+    )
+
+    return TokenResponse(
+        access_token=token
+    )

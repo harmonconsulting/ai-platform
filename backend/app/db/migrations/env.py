@@ -2,7 +2,8 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.db.base import Base
-from app.models import user, conversation, message  # noqa
+from app.models import user, conversation, message
+from app.models import team  # noqa
 from app.core.config import settings
 
 config = context.config

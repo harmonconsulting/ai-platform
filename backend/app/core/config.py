@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
 
+    JWT_SECRET: str = "change-this-dev-secret"
+
     class Config:
         env_file = ".env"
 

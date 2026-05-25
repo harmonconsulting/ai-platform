@@ -20,41 +20,48 @@ def chunk_text(text: str, chunk_size: int = 1200, overlap: int = 200):
     return chunks
 
 
-def add_document(text: str, doc_id: str, filename: str = "unknown"):
+def add_document(
+    text: str,
+    doc_id: str = "unknown",
+    filename: str = "unknown",
+    team_slug: str = "global",
+):
     chunks = chunk_text(text)
 
     ids = []
-    embeddings = []
     documents = []
+    embeddings = []
     metadatas = []
 
-    for idx, chunk in enumerate(chunks):
-        ids.append(f"{doc_id}-{idx}")
-        embeddings.append(model.encode(chunk).tolist())
+    for i, chunk in enumerate(chunks):
+        ids.append(f"{team_slug}:{doc_id}:{i}")
         documents.append(chunk)
+        embeddings.append(model.encode(chunk).tolist())
         metadatas.append({
             "doc_id": doc_id,
             "filename": filename,
-            "chunk_index": idx
+            "chunk_index": i,
+            "team_slug": team_slug,
         })
 
     if ids:
-        collection.add(
+        collection.upsert(
             ids=ids,
-            embeddings=embeddings,
             documents=documents,
-            metadatas=metadatas
+            embeddings=embeddings,
+            metadatas=metadatas,
         )
 
     return len(ids)
 
 
-def search(query: str, k: int = 5):
+def search(query: str, k: int = 5, team_slug: str = "global"):
     embedding = model.encode(query).tolist()
 
     results = collection.query(
         query_embeddings=[embedding],
-        n_results=k
+        n_results=k,
+        where={"team_slug": team_slug},
     )
 
     docs = results.get("documents", [[]])[0]
@@ -63,15 +70,20 @@ def search(query: str, k: int = 5):
     return [
         {
             "content": doc,
-            "metadata": meta
+            "metadata": meta or {},
         }
         for doc, meta in zip(docs, metas)
     ]
 
 
-def delete_document(doc_id: str):
+def delete_document_by_filename(filename: str, team_slug: str = "global"):
     results = collection.get(
-        where={"doc_id": doc_id}
+        where={
+            "$and": [
+                {"filename": filename},
+                {"team_slug": team_slug},
+            ]
+        }
     )
 
     ids = results.get("ids", [])
@@ -82,11 +94,8 @@ def delete_document(doc_id: str):
     return len(ids)
 
 
-def delete_document_by_filename(filename: str):
-    results = collection.get(
-        where={"filename": filename}
-    )
-
+def reset_team_knowledge(team_slug: str):
+    results = collection.get(where={"team_slug": team_slug})
     ids = results.get("ids", [])
 
     if ids:
