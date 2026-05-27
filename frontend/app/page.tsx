@@ -273,6 +273,12 @@ Login
 return (
 
     <main className="flex min-h-screen bg-neutral-950 text-neutral-100">
+      <button
+        onClick={handleLogout}
+        className="fixed right-4 top-4 z-50 rounded border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
+      >
+        Logout
+      </button>
       <aside className="w-72 border-r border-neutral-800 p-4">
         <button
           onClick={newChat}
@@ -327,9 +333,7 @@ return (
       </aside>
 
       <section className="flex flex-1 flex-col">
-        <div className="border-b border-neutral-800 p-4">
-          <h1 className="text-xl font-semibold">AI Platform</h1>
-        </div>
+        
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="mx-auto max-w-3xl space-y-4">
